@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@color/primary_dark"
+    android:padding="32dp">
+
+    <!-- Logo/Title -->
+    <ImageView
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:src="@mipmap/ic_launcher"
+        android:layout_marginBottom="24dp" />
+
+    <TextView
+        android:id="@+id/txtTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Visual Mapper"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/white"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Enter PIN to unlock"
+        android:textSize="14sp"
+        android:textColor="@android:color/white"
+        android:alpha="0.8"
+        android:layout_marginBottom="32dp" />
+
+    <!-- PIN Display -->
+    <TextView
+        android:id="@+id/txtPinDisplay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="32sp"
+        android:textColor="@android:color/white"
+        android:letterSpacing="0.5"
+        android:layout_marginBottom="16dp"
+        android:minWidth="100dp"
+        android:gravity="center" />
+
+    <!-- Error Message -->
+    <TextView
+        android:id="@+id/txtError"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Incorrect PIN"
+        android:textSize="14sp"
+        android:textColor="#FF6B6B"
+        android:visibility="gone"
+        android:layout_marginBottom="16dp" />
+
+    <!-- PIN Pad -->
+    <LinearLayout
+        android:id="@+id/layoutPinPad"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <!-- Row 1: 1 2 3 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn1"
+                style="@style/PinButton"
+                android:text="1" />
+            <Button
+                android:id="@+id/btn2"
+                style="@style/PinButton"
+                android:text="2" />
+            <Button
+                android:id="@+id/btn3"
+                style="@style/PinButton"
+                android:text="3" />
+        </LinearLayout>
+
+        <!-- Row 2: 4 5 6 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn4"
+                style="@style/PinButton"
+                android:text="4" />
+            <Button
+                android:id="@+id/btn5"
+                style="@style/PinButton"
+                android:text="5" />
+            <Button
+                android:id="@+id/btn6"
+                style="@style/PinButton"
+                android:text="6" />
+        </LinearLayout>
+
+        <!-- Row 3: 7 8 9 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn7"
+                style="@style/PinButton"
+                android:text="7" />
+            <Button
+                android:id="@+id/btn8"
+                style="@style/PinButton"
+                android:text="8" />
+            <Button
+                android:id="@+id/btn9"
+                style="@style/PinButton"
+                android:text="9" />
+        </LinearLayout>
+
+        <!-- Row 4: Biometric 0 Delete -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <ImageButton
+                android:id="@+id/btnBiometric"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:src="@android:drawable/ic_menu_compass"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Biometric"
+                android:layout_margin="8dp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btn0"
+                style="@style/PinButton"
+                android:text="0" />
+
+            <ImageButton
+                android:id="@+id/btnDelete"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:src="@android:drawable/ic_input_delete"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Delete"
+                android:layout_margin="8dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Lockout Display -->
+    <LinearLayout
+        android:id="@+id/layoutLockout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@android:drawable/ic_lock_lock"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/txtLockout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Too many attempts\nTry again in 30 seconds"
+            android:textSize="16sp"
+            android:textColor="@android:color/white"
+            android:gravity="center" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Visual Mapper Icon - Device with grid overlay and crosshair -->
+    <!-- Scaled from 128x128 SVG to fit 108x108 adaptive icon (centered in safe zone) -->
+
+    <!-- Device outline (smartphone) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#1e40af"
+        android:strokeWidth="2"
+        android:pathData="M37,22 L71,22 Q74,22 74,25 L74,83 Q74,86 71,86 L37,86 Q34,86 34,83 L34,25 Q34,22 37,22 Z"/>
+
+    <!-- Device screen (dark blue) -->
+    <path
+        android:fillColor="#1e3a8a"
+        android:pathData="M38,28 L70,28 Q71,28 71,29 L71,77 Q71,78 70,78 L38,78 Q37,78 37,77 L37,29 Q37,28 38,28 Z"/>
+
+    <!-- Grid lines - vertical -->
+    <path
+        android:fillColor="#60a5fa"
+        android:fillAlpha="0.7"
+        android:pathData="M47,28 L48,28 L48,78 L47,78 Z"/>
+    <path
+        android:fillColor="#60a5fa"
+        android:fillAlpha="0.7"
+        android:pathData="M54,28 L55,28 L55,78 L54,78 Z"/>
+    <path
+        android:fillColor="#60a5fa"
+        android:fillAlpha="0.7"
+        android:pathData="M61,28 L62,28 L62,78 L61,78 Z"/>
+
+    <!-- Grid lines - horizontal -->
+    <path
+        android:fillColor="#60a5fa"
+        android:fillAlpha="0.7"
+        android:pathData="M37,40 L71,40 L71,41 L37,41 Z"/>
+    <path
+        android:fillColor="#60a5fa"
+        android:fillAlpha="0.7"
+        android:pathData="M37,53 L71,53 L71,54 L37,54 Z"/>
+    <path
+        android:fillColor="#60a5fa"
+        android:fillAlpha="0.7"
+        android:pathData="M37,66 L71,66 L71,67 L37,67 Z"/>
+
+    <!-- Highlighted element (pink accent) -->
+    <path
+        android:fillColor="#ec4899"
+        android:fillAlpha="0.85"
+        android:pathData="M47,40 L61,40 Q62,40 62,41 L62,53 Q62,54 61,54 L47,54 Q46,54 46,53 L46,41 Q46,40 47,40 Z"/>
+
+    <!-- Crosshair/target indicator - circle -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M54,47 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0"/>
+
+    <!-- Crosshair lines -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M53.25,42 L54.75,42 L54.75,45 L53.25,45 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M53.25,49 L54.75,49 L54.75,52 L53.25,52 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M49,46.25 L52,46.25 L52,47.75 L49,47.75 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M56,46.25 L59,46.25 L59,47.75 L56,47.75 Z"/>
+
+</vector>

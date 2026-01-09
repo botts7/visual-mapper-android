@@ -1,0 +1,19 @@
+# Visual Mapper Android Companion - local.properties
+# ============================================
+#
+# Copy this file to local.properties and update with your SDK paths.
+# DO NOT commit local.properties to version control!
+#
+# This file is in .gitignore for security reasons.
+
+# Windows Example:
+# sdk.dir=C:\\Users\\YOUR_USERNAME\\AppData\\Local\\Android\\Sdk
+
+# macOS Example:
+# sdk.dir=/Users/YOUR_USERNAME/Library/Android/sdk
+
+# Linux Example:
+# sdk.dir=/home/YOUR_USERNAME/Android/Sdk
+
+# Your SDK path (update this):
+sdk.dir=YOUR_ANDROID_SDK_PATH_HERE

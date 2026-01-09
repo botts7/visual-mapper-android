@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="8dp"
+    app:cardBackgroundColor="#E6212121">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:minWidth="180dp">
+
+        <!-- Status Header -->
+        <TextView
+            android:id="@+id/textStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Exploring..."
+            android:textColor="#4CAF50"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Stats -->
+        <TextView
+            android:id="@+id/textScreens"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Screens: 0"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/textElements"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Elements: 0"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/textQueue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Queue: 0"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp" />
+
+        <!-- Stop Button -->
+        <Button
+            android:id="@+id/btnStop"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:layout_marginTop="8dp"
+            android:text="STOP"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#F44336"
+            style="@style/Widget.MaterialComponents.Button" />
+
+        <!-- Drag hint -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Drag to move"
+            android:textColor="#666666"
+            android:textSize="10sp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="4dp" />
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

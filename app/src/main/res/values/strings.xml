@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Visual Mapper</string>
+
+    <!-- Accessibility Service -->
+    <string name="accessibility_service_description">Visual Mapper Companion needs accessibility access to read UI elements from other apps and perform automated interactions like taps and swipes.</string>
+
+    <!-- Main Screen -->
+    <string name="title_status">Status</string>
+    <string name="title_settings">Settings</string>
+    <string name="title_flows">Flows</string>
+
+    <!-- Status -->
+    <string name="status_connected">Connected</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_error">Error</string>
+
+    <!-- Accessibility -->
+    <string name="accessibility_enabled">Accessibility Service Enabled</string>
+    <string name="accessibility_disabled">Accessibility Service Disabled</string>
+    <string name="accessibility_enable_button">Enable Accessibility</string>
+    <string name="accessibility_required">Accessibility service is required for Visual Mapper to work</string>
+
+    <!-- MQTT -->
+    <string name="mqtt_broker_label">MQTT Broker</string>
+    <string name="mqtt_broker_hint">192.168.1.100</string>
+    <string name="mqtt_port_label">MQTT Port</string>
+    <string name="mqtt_port_hint">1883</string>
+    <string name="mqtt_username_label">Username (optional)</string>
+    <string name="mqtt_password_label">Password (optional)</string>
+    <string name="mqtt_connect_button">Connect</string>
+    <string name="mqtt_disconnect_button">Disconnect</string>
+    <string name="mqtt_status_connected">MQTT Connected</string>
+    <string name="mqtt_status_disconnected">MQTT Disconnected</string>
+
+    <!-- Server -->
+    <string name="server_url_label">Visual Mapper Server</string>
+    <string name="server_url_hint">http://192.168.1.100:3000</string>
+    <string name="server_sync_button">Sync Flows</string>
+    <string name="server_status_available">Server Available</string>
+    <string name="server_status_unavailable">Server Unavailable</string>
+
+    <!-- Flows -->
+    <string name="flows_empty">No flows synced. Connect to server to sync flows.</string>
+    <string name="flow_execute_button">Execute</string>
+    <string name="flow_last_run">Last run: %1$s</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_name">Visual Mapper Service</string>
+    <string name="notification_channel_description">Notifications for Visual Mapper background service</string>
+    <string name="notification_title">Visual Mapper Running</string>
+    <string name="notification_text">Monitoring and executing flows</string>
+
+    <!-- Errors -->
+    <string name="error_accessibility_required">Please enable accessibility service</string>
+    <string name="error_mqtt_connection">Failed to connect to MQTT broker</string>
+    <string name="error_server_connection">Failed to connect to server</string>
+    <string name="error_flow_execution">Flow execution failed: %1$s</string>
+</resources>
