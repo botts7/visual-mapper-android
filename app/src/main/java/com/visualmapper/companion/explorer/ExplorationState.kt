@@ -548,6 +548,92 @@ class NavigationGraph {
     }
 
     /**
+     * Find optimal path using Dijkstra with reliability-weighted edges.
+     * Higher reliability paths are preferred (lower cost).
+     *
+     * @param fromScreen Starting screen ID
+     * @param toScreen Target screen ID
+     * @return List of (screenId, elementId) pairs, or null if no path exists
+     */
+    fun findOptimalPath(fromScreen: String, toScreen: String): List<Pair<String, String>>? {
+        if (fromScreen == toScreen) return emptyList()
+
+        // PathState for Dijkstra priority queue
+        data class PathState(
+            val screen: String,
+            val cost: Float,
+            val path: List<Pair<String, String>>
+        )
+
+        val visited = mutableSetOf<String>()
+        val queue = java.util.PriorityQueue<PathState>(compareBy { it.cost })
+        queue.add(PathState(fromScreen, 0f, emptyList()))
+
+        while (queue.isNotEmpty()) {
+            val current = queue.poll()
+            if (current.screen in visited) continue
+            visited.add(current.screen)
+
+            val screenTransitions = transitions[current.screen] ?: continue
+            for ((elementId, nextScreen) in screenTransitions) {
+                if (nextScreen in visited) continue
+
+                // Skip blocker screens unless they're the target
+                if (nextScreen != toScreen && isBlockerScreen(nextScreen)) continue
+
+                // Calculate edge cost based on reliability (lower cost = better)
+                val reliability = getTransitionReliability(current.screen, elementId, nextScreen)
+                val edgeCost = 1f - reliability  // reliability 1.0 → cost 0.0
+
+                val newPath = current.path + (current.screen to elementId)
+
+                if (nextScreen == toScreen) {
+                    return newPath
+                }
+
+                queue.add(PathState(nextScreen, current.cost + edgeCost, newPath))
+            }
+        }
+        return null
+    }
+
+    /**
+     * Get reliability score for a transition (0.0 to 1.0).
+     * Based on visit counts from ElementNavigation tracking.
+     */
+    private fun getTransitionReliability(
+        fromScreen: String,
+        elementId: String,
+        toScreen: String
+    ): Float {
+        val key = "$fromScreen:$elementId"
+        val nav = elementNavigations[key]
+
+        if (nav == null) {
+            // Unknown transition - give it a default reliability
+            return 0.5f
+        }
+
+        val totalVisits = nav.destinations.values.sum()
+        if (totalVisits == 0) return 0.5f
+
+        val visitsToTarget = nav.destinations[toScreen] ?: 0
+        // Base reliability on how often this transition leads to the expected screen
+        val baseReliability = visitsToTarget.toFloat() / totalVisits.toFloat()
+
+        // Boost reliability if element has been used many times (more confidence)
+        val confidenceBoost = minOf(0.2f, nav.tapCount * 0.02f)
+
+        // Penalize if this is a conditional element (less predictable)
+        val conditionalPenalty = if (nav.isConditional()) 0.1f else 0f
+
+        // Penalize if target is sometimes a blocker
+        val blockerPenalty = if (nav.blockerDestinations.contains(toScreen)) 0.3f else 0f
+
+        return (baseReliability + confidenceBoost - conditionalPenalty - blockerPenalty).coerceIn(0.1f, 1.0f)
+    }
+
+    /**
      * Get all known screens
      */
     fun getAllScreens(): Set<String> = knownScreens.toSet()

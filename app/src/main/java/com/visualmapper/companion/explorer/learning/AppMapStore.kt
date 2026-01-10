@@ -272,21 +272,143 @@ class AppMapStore(context: Context) {
     }
 
     /**
-     * Find the best path between two screens
+     * Find the best path between two screens using Dijkstra.
+     * Considers path reliability as edge weights.
      */
     fun findBestPath(packageName: String, fromScreenId: String, toScreenId: String): NavigationPath? {
+        if (fromScreenId == toScreenId) return null
+
         val map = getAppMap(packageName) ?: return null
 
-        // Direct path
+        // Direct path lookup first (most efficient)
         val directPath = map.navigationPaths.find {
-            it.fromScreen == fromScreenId && it.toScreen == toScreenId
+            it.fromScreen == fromScreenId && it.toScreen == toScreenId && it.reliability > 0.3f
         }
-        if (directPath != null && directPath.reliability > 0.3f) {
+        if (directPath != null) {
             return directPath
         }
 
-        // TODO: Implement BFS/Dijkstra for multi-hop paths
+        // Build graph and run Dijkstra for multi-hop paths
+        val graph = buildNavigationGraph(map)
+        val dijkstraPath = findDijkstraPath(graph, fromScreenId, toScreenId)
+
+        return dijkstraPath?.let { path ->
+            constructNavigationPath(map, fromScreenId, toScreenId, path)
+        }
+    }
+
+    /**
+     * Build a navigation graph from the app map.
+     * Returns Map<fromScreen, List<Triple<toScreen, elementId, reliability>>>
+     */
+    private fun buildNavigationGraph(
+        map: LearnedAppMap
+    ): Map<String, List<Triple<String, String, Float>>> {
+        val graph = mutableMapOf<String, MutableList<Triple<String, String, Float>>>()
+
+        for (navPath in map.navigationPaths) {
+            if (navPath.reliability < 0.1f) continue  // Skip unreliable paths
+
+            val edges = graph.getOrPut(navPath.fromScreen) { mutableListOf() }
+            val elementId = navPath.steps.firstOrNull()?.elementId ?: "unknown"
+            edges.add(Triple(navPath.toScreen, elementId, navPath.reliability))
+        }
+        return graph
+    }
+
+    /**
+     * Find path using Dijkstra algorithm with reliability as weights.
+     * Returns list of (toScreen, elementId) pairs representing the path.
+     */
+    private fun findDijkstraPath(
+        graph: Map<String, List<Triple<String, String, Float>>>,
+        fromScreen: String,
+        toScreen: String
+    ): List<Pair<String, String>>? {
+        data class PathState(
+            val screen: String,
+            val cost: Float,
+            val path: List<Pair<String, String>>  // List of (nextScreen, elementId)
+        )
+
+        val visited = mutableSetOf<String>()
+        val queue = java.util.PriorityQueue<PathState>(compareBy { it.cost })
+        queue.add(PathState(fromScreen, 0f, emptyList()))
+
+        while (queue.isNotEmpty()) {
+            val current = queue.poll()
+            if (current.screen in visited) continue
+            visited.add(current.screen)
+
+            if (current.screen == toScreen && current.path.isNotEmpty()) {
+                return current.path
+            }
+
+            val edges = graph[current.screen] ?: continue
+            for ((nextScreen, elementId, reliability) in edges) {
+                if (nextScreen in visited) continue
+
+                val edgeCost = 1f - reliability  // Higher reliability = lower cost
+                val newPath = current.path + (nextScreen to elementId)
+
+                if (nextScreen == toScreen) {
+                    return newPath
+                }
+
+                queue.add(PathState(nextScreen, current.cost + edgeCost, newPath))
+            }
+        }
         return null
+    }
+
+    /**
+     * Construct a NavigationPath from the Dijkstra result.
+     */
+    private fun constructNavigationPath(
+        map: LearnedAppMap,
+        fromScreen: String,
+        toScreen: String,
+        path: List<Pair<String, String>>
+    ): NavigationPath {
+        val steps = mutableListOf<NavigationStep>()
+        var currentScreen = fromScreen
+
+        for ((nextScreen, elementId) in path) {
+            // Find the original path to get step details
+            val originalPath = map.navigationPaths.find {
+                it.fromScreen == currentScreen && it.toScreen == nextScreen
+            }
+
+            val step = originalPath?.steps?.firstOrNull() ?: NavigationStep(
+                actionType = "click",
+                elementId = elementId,
+                elementText = null,
+                bounds = null
+            )
+            steps.add(step)
+            currentScreen = nextScreen
+        }
+
+        // Calculate combined reliability (product of individual reliabilities)
+        var combinedReliability = 1f
+        currentScreen = fromScreen
+        for ((nextScreen, _) in path) {
+            val pathReliability = map.navigationPaths.find {
+                it.fromScreen == currentScreen && it.toScreen == nextScreen
+            }?.reliability ?: 0.5f
+            combinedReliability *= pathReliability
+            currentScreen = nextScreen
+        }
+
+        return NavigationPath(
+            fromScreen = fromScreen,
+            toScreen = toScreen,
+            steps = steps,
+            reliability = combinedReliability,
+            successCount = 0,
+            failureCount = 0,
+            lastUsed = System.currentTimeMillis()
+        )
     }
 
     /**

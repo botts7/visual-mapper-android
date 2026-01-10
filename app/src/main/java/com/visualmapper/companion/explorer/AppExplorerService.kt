@@ -6335,6 +6335,11 @@ class AppExplorerService : Service() {
         val sensors = mutableListOf<GeneratedSensor>()
         val actions = mutableListOf<GeneratedAction>()
 
+        // Find the entry screen (earliest discovered screen by timestamp)
+        val entryScreenId = currentState.exploredScreens.entries.minByOrNull { (_, screen) ->
+            screen.timestamp
+        }?.key
+
         // Generate launch step
         steps.add(GeneratedFlowStep(
             type = GeneratedStepType.LAUNCH_APP,
@@ -6364,13 +6369,20 @@ class AppExplorerService : Service() {
             // Generate actions from clickable elements
             for (clickable in screen.clickableElements) {
                 if (clickable.explored && clickable.actionType != ClickableActionType.NO_EFFECT) {
+                    // Compute navigation path from entry screen to this action's screen
+                    val stepsToReach = computeStepsToScreen(
+                        currentState,
+                        entryScreenId,
+                        screen.screenId
+                    )
+
                     actions.add(GeneratedAction(
                         name = generateActionName(clickable.text, clickable.resourceId),
                         screenId = screen.screenId,
                         elementId = clickable.elementId,
                         resourceId = clickable.resourceId,
                         actionType = clickable.actionType,
-                        stepsToReach = emptyList() // TODO: compute path
+                        stepsToReach = stepsToReach
                     ))
                 }
             }
@@ -6383,6 +6395,52 @@ class AppExplorerService : Service() {
             sensors = sensors,
             actions = actions
         )
+    }
+
+    /**
+     * Compute navigation steps to reach a target screen from an entry screen.
+     * Uses the navigation graph's Dijkstra-based optimal path finding.
+     *
+     * @param currentState The current exploration state
+     * @param entryScreenId The screen where navigation starts (app launch screen)
+     * @param targetScreenId The screen to navigate to
+     * @return List of GeneratedFlowStep to reach the target, empty if already there or no path
+     */
+    private fun computeStepsToScreen(
+        currentState: ExplorationState,
+        entryScreenId: String?,
+        targetScreenId: String
+    ): List<GeneratedFlowStep> {
+        // If entry screen is null or same as target, no steps needed
+        if (entryScreenId == null || entryScreenId == targetScreenId) {
+            return emptyList()
+        }
+
+        // Use optimal path finding from navigation graph
+        val path = currentState.navigationGraph.findOptimalPath(entryScreenId, targetScreenId)
+            ?: return emptyList()
+
+        // Convert path to GeneratedFlowSteps
+        return path.mapNotNull { (screenId, elementId) ->
+            val screen = currentState.exploredScreens[screenId]
+            val element = screen?.clickableElements?.find { it.elementId == elementId }
+
+            if (element != null) {
+                GeneratedFlowStep(
+                    type = GeneratedStepType.TAP,
+                    screenId = screenId,
+                    elementId = elementId,
+                    x = element.centerX,
+                    y = element.centerY,
+                    text = null,
+                    waitMs = 1500,  // Wait for navigation
+                    description = "Tap ${element.text ?: element.resourceId ?: "element"}"
+                )
+            } else {
+                // Element not found in explored screens, skip
+                null
+            }
+        }
     }
 
     // =========================================================================

@@ -345,6 +345,95 @@ class ServerSyncManager(private val context: Context) {
         }
     }
 
+    /**
+     * Push local flow changes back to the server.
+     * Used when a flow is modified on the Android device.
+     *
+     * @param flow The flow to sync to server
+     * @return Result indicating success or failure with error message
+     */
+    suspend fun pushFlowChanges(flow: Flow): Result<Unit> {
+        val url = serverUrl ?: return Result.failure(Exception("No server URL configured"))
+
+        return try {
+            val response = httpClient.put("$url/api/flows/${flow.id}") {
+                contentType(ContentType.Application.Json)
+                setBody(flow)
+            }
+
+            when (response.status) {
+                HttpStatusCode.OK, HttpStatusCode.NoContent -> {
+                    Log.i(TAG, "Flow ${flow.id} synced to server successfully")
+                    Result.success(Unit)
+                }
+                HttpStatusCode.NotFound -> {
+                    Log.w(TAG, "Flow ${flow.id} not found on server - creating new")
+                    // Try to create if not found
+                    createFlow(flow)
+                }
+                else -> {
+                    Log.w(TAG, "Flow sync returned unexpected status: ${response.status}")
+                    Result.failure(Exception("Server returned ${response.status}"))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync flow ${flow.id}: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Create a new flow on the server.
+     */
+    private suspend fun createFlow(flow: Flow): Result<Unit> {
+        val url = serverUrl ?: return Result.failure(Exception("No server URL configured"))
+
+        return try {
+            val response = httpClient.post("$url/api/flows") {
+                contentType(ContentType.Application.Json)
+                setBody(flow)
+            }
+
+            if (response.status == HttpStatusCode.OK || response.status == HttpStatusCode.Created) {
+                Log.i(TAG, "Flow ${flow.id} created on server")
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Server returned ${response.status}"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create flow: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Delete a flow from the server.
+     *
+     * @param flowId The ID of the flow to delete
+     * @return Result indicating success or failure
+     */
+    suspend fun deleteFlow(flowId: String): Result<Unit> {
+        val url = serverUrl ?: return Result.failure(Exception("No server URL configured"))
+
+        return try {
+            val response = httpClient.delete("$url/api/flows/$flowId")
+
+            when (response.status) {
+                HttpStatusCode.OK, HttpStatusCode.NoContent, HttpStatusCode.NotFound -> {
+                    Log.i(TAG, "Flow $flowId deleted from server")
+                    Result.success(Unit)
+                }
+                else -> {
+                    Log.w(TAG, "Flow delete returned: ${response.status}")
+                    Result.failure(Exception("Server returned ${response.status}"))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete flow $flowId: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
     // =========================================================================
     // Execution Reporting
     // =========================================================================

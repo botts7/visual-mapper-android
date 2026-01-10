@@ -22,6 +22,7 @@ import com.visualmapper.companion.sensor.SensorCaptureManager
 import com.visualmapper.companion.storage.AppDatabase
 import com.visualmapper.companion.storage.ExecutionResultEntity
 import com.visualmapper.companion.storage.FlowStorage
+import com.visualmapper.companion.explorer.ScreenWakeManager
 import com.visualmapper.companion.ui.MainActivity
 import com.visualmapper.companion.VisualMapperApp
 import kotlinx.coroutines.*
@@ -668,15 +669,41 @@ class FlowExecutorService : Service() {
             }
 
             StepType.CONDITIONAL -> {
-                Log.w(TAG, "CONDITIONAL: Stub implementation - not yet implemented in Android")
-                // TODO: Implement conditional logic
+                val condition = step.condition
+                if (condition.isNullOrBlank()) {
+                    Log.d(TAG, "CONDITIONAL: No condition specified, passing")
+                    return true
+                }
+
+                val service = accessibilityService
+                if (service == null) {
+                    Log.e(TAG, "CONDITIONAL: Accessibility service not available")
+                    return false
+                }
+
+                val conditionMet = evaluateCondition(condition, service)
+                Log.i(TAG, "CONDITIONAL: '$condition' evaluated to $conditionMet")
+
+                val stepsToExecute = if (conditionMet) step.trueSteps else step.falseSteps
+                if (stepsToExecute.isNullOrEmpty()) {
+                    Log.d(TAG, "CONDITIONAL: No steps to execute for branch")
+                    return true
+                }
+
+                // Execute nested steps
+                Log.i(TAG, "CONDITIONAL: Executing ${stepsToExecute.size} steps from ${if (conditionMet) "true" else "false"} branch")
+                for (nestedStep in stepsToExecute) {
+                    if (!executeStep(nestedStep, flow)) {
+                        Log.w(TAG, "CONDITIONAL: Nested step failed")
+                        return false
+                    }
+                }
                 true
             }
 
             StepType.PULL_REFRESH -> {
-                Log.w(TAG, "PULL_REFRESH: Stub implementation - not yet implemented in Android")
-                // TODO: Implement pull-to-refresh gesture
-                true
+                Log.i(TAG, "PULL_REFRESH: Executing pull-to-refresh gesture")
+                accessibilityService?.gestureDispatcher?.pullToRefresh() ?: false
             }
 
             StepType.RESTART_APP -> {
@@ -710,35 +737,94 @@ class FlowExecutorService : Service() {
             }
 
             StepType.WAKE_SCREEN -> {
-                Log.w(TAG, "WAKE_SCREEN: Stub implementation - not yet implemented in Android")
-                // TODO: Implement wake screen using PowerManager
-                true
+                Log.i(TAG, "WAKE_SCREEN: Waking screen via ScreenWakeManager")
+                ScreenWakeManager.getInstance(applicationContext).wakeScreen()
             }
 
             StepType.SLEEP_SCREEN -> {
-                Log.w(TAG, "SLEEP_SCREEN: Stub implementation - not yet implemented in Android")
-                // TODO: Implement sleep screen using PowerManager
-                true
+                Log.i(TAG, "SLEEP_SCREEN: Releasing wake lock and locking screen")
+                val wakeManager = ScreenWakeManager.getInstance(applicationContext)
+                wakeManager.releaseWakeLock()
+                wakeManager.lockScreen()
             }
 
             StepType.ENSURE_SCREEN_ON -> {
-                Log.w(TAG, "ENSURE_SCREEN_ON: Stub implementation - not yet implemented in Android")
-                // TODO: Check screen state and wake if needed
-                true
+                Log.i(TAG, "ENSURE_SCREEN_ON: Checking screen state")
+                val wakeManager = ScreenWakeManager.getInstance(applicationContext)
+                if (!wakeManager.isScreenOn()) {
+                    Log.i(TAG, "ENSURE_SCREEN_ON: Screen off, waking...")
+                    wakeManager.wakeScreen()
+                } else {
+                    Log.d(TAG, "ENSURE_SCREEN_ON: Screen already on")
+                    true
+                }
             }
 
             StepType.TEXT -> {
                 val textToType = step.text ?: return false
                 Log.i(TAG, "TEXT: Typing text (length: ${textToType.length})")
-                // TODO: Implement text input via accessibility service
-                Log.w(TAG, "TEXT: Not yet implemented - requires IME or accessibility text insertion")
-                true
+                val service = accessibilityService
+                if (service == null) {
+                    Log.e(TAG, "TEXT: Accessibility service not available")
+                    false
+                } else {
+                    service.inputText(textToType)
+                }
             }
 
             StepType.KEYEVENT -> {
-                Log.w(TAG, "KEYEVENT: Stub implementation - not yet implemented in Android")
-                // TODO: Implement keyevent dispatch
-                true
+                val keycodeName = step.keycode ?: return false
+                Log.i(TAG, "KEYEVENT: Dispatching keycode $keycodeName")
+                val service = accessibilityService ?: return false
+                when (keycodeName.uppercase()) {
+                    "HOME", "KEYCODE_HOME" ->
+                        service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+                    "BACK", "KEYCODE_BACK" ->
+                        service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+                    "RECENTS", "KEYCODE_APP_SWITCH" ->
+                        service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS)
+                    "POWER", "KEYCODE_POWER" ->
+                        service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+                    "NOTIFICATIONS" ->
+                        service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
+                    "QUICK_SETTINGS" ->
+                        service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS)
+                    else -> {
+                        Log.w(TAG, "KEYEVENT: Unknown keycode $keycodeName")
+                        false
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Evaluate a condition string against the current UI state.
+     *
+     * Supported conditions:
+     * - hasText:Submit - Check if element with text "Submit" exists
+     * - hasElement:com.app:id/button - Check if element with resource ID exists
+     * - activityIs:MainActivity - Check if current activity contains "MainActivity"
+     * - notHasText:Loading - Check if element with text "Loading" does NOT exist
+     * - notHasElement:com.app:id/spinner - Check if element does NOT exist
+     */
+    private fun evaluateCondition(
+        condition: String,
+        service: VisualMapperAccessibilityService
+    ): Boolean {
+        val parts = condition.split(":", limit = 2)
+        val conditionType = parts.getOrNull(0)?.trim() ?: return false
+        val value = parts.getOrNull(1)?.trim() ?: return false
+
+        return when (conditionType.lowercase()) {
+            "hastext" -> service.hasElementWithText(value)
+            "haselement" -> service.hasElementWithResourceId(value)
+            "activityis" -> service.getCurrentActivityName()?.contains(value, ignoreCase = true) == true
+            "nothastext" -> !service.hasElementWithText(value)
+            "nothaselement" -> !service.hasElementWithResourceId(value)
+            else -> {
+                Log.w(TAG, "evaluateCondition: Unknown condition type '$conditionType'")
+                false
             }
         }
     }
