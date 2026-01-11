@@ -89,7 +89,7 @@ class ServerSyncManager(private val context: Context) {
      * Get stable device ID from server (survives IP/port changes)
      *
      * @param url Server URL
-     * @param adbDeviceId ADB device ID (e.g., "192.168.86.2:46747")
+     * @param adbDeviceId ADB device ID (e.g., "192.168.1.2:46747")
      * @return Stable device ID or null if not found
      */
     suspend fun getStableDeviceId(url: String, adbDeviceId: String): String? {
@@ -126,7 +126,7 @@ class ServerSyncManager(private val context: Context) {
     /**
      * Connect to Visual Mapper server
      *
-     * @param url Server URL (e.g., "http://192.168.86.129:8080")
+     * @param url Server URL (e.g., "http://192.168.1.129:8080")
      * @param deviceId Device ID
      * @param mqttOnly If true, skip HTTP health check and allow MQTT-only mode
      * @return True if connected (or MQTT-only mode enabled), false if HTTP connection required but failed
@@ -230,7 +230,7 @@ class ServerSyncManager(private val context: Context) {
      * for Android-side CAPTURE_SENSORS execution
      *
      * @param stableDeviceId Android stable device ID (from VisualMapperApp)
-     * @param adbDeviceId ADB device ID (IP:port format, e.g., "192.168.86.2:46747")
+     * @param adbDeviceId ADB device ID (IP:port format, e.g., "192.168.1.2:46747")
      */
     suspend fun syncFlows(stableDeviceId: String, adbDeviceId: String? = null): List<Flow> {
         val url = serverUrl ?: return emptyList()
