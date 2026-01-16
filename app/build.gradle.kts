@@ -84,6 +84,9 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
 
+    // OkHttp for WebSocket streaming
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // DataStore for preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 

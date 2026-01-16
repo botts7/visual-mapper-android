@@ -1,9 +1,11 @@
 package com.visualmapper.companion.ui.fragments
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -19,6 +21,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.visualmapper.companion.streaming.ScreenCaptureService
+import com.visualmapper.companion.streaming.StreamingConfig
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputEditText
 import com.visualmapper.companion.R
@@ -189,6 +193,25 @@ class SettingsFragment : Fragment() {
     private lateinit var btnMlServerStop: Button
     private lateinit var btnRefreshServices: Button
 
+    // Screen Streaming
+    private lateinit var cardScreenStreaming: View
+    private lateinit var streamingStatusDot: View
+    private lateinit var textStreamingStatus: TextView
+    private lateinit var btnStartStreaming: Button
+    private lateinit var btnStopStreaming: Button
+    private lateinit var textStreamingStats: TextView
+
+    // MediaProjection permission request
+    private val mediaProjectionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            startScreenStreaming(result.resultCode, result.data!!)
+        } else {
+            Toast.makeText(requireContext(), "Screen capture permission denied", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // Learning stores and managers
     private val connectionManager by lazy { ConnectionManager.getInstance(requireContext()) }
     private val feedbackStore by lazy { FeedbackStore.getInstance(requireContext()) }
@@ -216,6 +239,7 @@ class SettingsFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         updateAccessibilityStatus()
+        updateStreamingStatus()
     }
 
     override fun onDestroyView() {
@@ -335,6 +359,14 @@ class SettingsFragment : Fragment() {
         // Display device IP address
         updateDeviceIpDisplay()
 
+        // Screen Streaming
+        cardScreenStreaming = view.findViewById(R.id.cardScreenStreaming)
+        streamingStatusDot = view.findViewById(R.id.streamingStatusDot)
+        textStreamingStatus = view.findViewById(R.id.textStreamingStatus)
+        btnStartStreaming = view.findViewById(R.id.btnStartStreaming)
+        btnStopStreaming = view.findViewById(R.id.btnStopStreaming)
+        textStreamingStats = view.findViewById(R.id.textStreamingStats)
+
         android.util.Log.i("SettingsFragment", "=== initViews completed ===")
         android.util.Log.i("SettingsFragment", "btnStartBatchTraining found: ${btnStartBatchTraining != null}")
     }
@@ -375,6 +407,14 @@ class SettingsFragment : Fragment() {
         }
         btnRefreshServices.setOnClickListener {
             refreshServicesStatus()
+        }
+
+        // Screen Streaming
+        btnStartStreaming.setOnClickListener {
+            requestScreenCapturePermission()
+        }
+        btnStopStreaming.setOnClickListener {
+            stopScreenStreaming()
         }
 
         // Auto-connect
@@ -1826,6 +1866,85 @@ class SettingsFragment : Fragment() {
             .getInt("adb_port", 0)
         if (savedPort > 0) {
             editAdbPort.setText(savedPort.toString())
+        }
+    }
+
+    // =========================================================================
+    // Screen Streaming Methods
+    // =========================================================================
+
+    private fun requestScreenCapturePermission() {
+        // Check if server URL is configured
+        val serverUrl = editServerUrl.text.toString().trim()
+        if (serverUrl.isEmpty()) {
+            Toast.makeText(requireContext(), "Please configure server URL first", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Check if already streaming
+        if (ScreenCaptureService.isRunning()) {
+            Toast.makeText(requireContext(), "Already streaming", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Request MediaProjection permission
+        val projectionManager = requireContext().getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        val captureIntent = projectionManager.createScreenCaptureIntent()
+        mediaProjectionLauncher.launch(captureIntent)
+    }
+
+    private fun startScreenStreaming(resultCode: Int, data: Intent) {
+        val serverUrl = editServerUrl.text.toString().trim()
+        val deviceId = app.stableDeviceId
+
+        android.util.Log.i("SettingsFragment", "Starting screen streaming: server=$serverUrl, device=$deviceId")
+
+        // Start the screen capture service
+        ScreenCaptureService.start(
+            context = requireContext(),
+            resultCode = resultCode,
+            resultData = data,
+            serverUrl = serverUrl,
+            deviceId = deviceId,
+            quality = "fast"
+        )
+
+        // Update UI
+        updateStreamingStatus()
+
+        Toast.makeText(requireContext(), "Screen streaming started", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun stopScreenStreaming() {
+        ScreenCaptureService.stop(requireContext())
+        updateStreamingStatus()
+        Toast.makeText(requireContext(), "Screen streaming stopped", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun updateStreamingStatus() {
+        val isStreaming = ScreenCaptureService.isRunning()
+
+        if (isStreaming) {
+            streamingStatusDot.setBackgroundResource(R.drawable.status_dot_green)
+            textStreamingStatus.text = "Streaming"
+            btnStartStreaming.visibility = View.GONE
+            btnStopStreaming.visibility = View.VISIBLE
+            textStreamingStats.visibility = View.VISIBLE
+
+            // Update stats
+            val service = ScreenCaptureService.getInstance()
+            if (service != null) {
+                val stats = service.getStats()
+                val fps = (stats["fps"] as? Double) ?: 0.0
+                val framesSent = (stats["framesSent"] as? Int) ?: 0
+                textStreamingStats.text = "Stats: Frames sent $framesSent, FPS ${"%.1f".format(fps)}"
+            }
+        } else {
+            streamingStatusDot.setBackgroundResource(R.drawable.status_dot_gray)
+            textStreamingStatus.text = "Not streaming"
+            btnStartStreaming.visibility = View.VISIBLE
+            btnStopStreaming.visibility = View.GONE
+            textStreamingStats.visibility = View.GONE
         }
     }
 
