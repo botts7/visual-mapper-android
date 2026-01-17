@@ -189,7 +189,8 @@ class StreamingWebSocketClient(
             .replace("https://", "wss://")
             .trimEnd('/')
 
-        return "$baseUrl/ws/companion-stream/$deviceId"
+        // Backend routes use /api prefix
+        return "$baseUrl/api/ws/companion-stream/$deviceId"
     }
 
     private fun startFrameSender() {
