@@ -1909,15 +1909,24 @@ class SettingsFragment : Fragment() {
             quality = "fast"
         )
 
-        // Update UI
-        updateStreamingStatus()
+        // Update UI after a short delay to allow service to start
+        viewLifecycleOwner.lifecycleScope.launch {
+            kotlinx.coroutines.delay(500)
+            updateStreamingStatus()
+        }
 
         Toast.makeText(requireContext(), "Screen streaming started", Toast.LENGTH_SHORT).show()
     }
 
     private fun stopScreenStreaming() {
         ScreenCaptureService.stop(requireContext())
-        updateStreamingStatus()
+
+        // Update UI after a short delay to allow service to stop
+        viewLifecycleOwner.lifecycleScope.launch {
+            kotlinx.coroutines.delay(500)
+            updateStreamingStatus()
+        }
+
         Toast.makeText(requireContext(), "Screen streaming stopped", Toast.LENGTH_SHORT).show()
     }
 

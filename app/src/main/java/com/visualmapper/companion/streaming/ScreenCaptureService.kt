@@ -139,10 +139,22 @@ class ScreenCaptureService : Service() {
     private var screenWidth = 1080
     private var screenHeight = 1920
     private var screenDensity = 320
+    private var lastOrientation = 0
 
     // Frame pacing
     private var lastFrameTime = 0L
     private var frameNumber = 0
+
+    // Orientation change callback
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) {}
+        override fun onDisplayRemoved(displayId: Int) {}
+        override fun onDisplayChanged(displayId: Int) {
+            if (displayId == android.view.Display.DEFAULT_DISPLAY) {
+                checkOrientationChange()
+            }
+        }
+    }
 
     // Wake lock
     private var wakeLock: PowerManager.WakeLock? = null
@@ -270,9 +282,70 @@ class ScreenCaptureService : Service() {
         // Start streaming loop
         startStreamingLoop()
 
+        // Register display listener for orientation changes
+        val displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        displayManager.registerDisplayListener(displayListener, handler)
+        lastOrientation = resources.configuration.orientation
+
         _streamState.value = StreamState.STREAMING
         updateNotification("Streaming at ${quality.targetFps} FPS")
         Log.i(TAG, "Capture started: ${scaledWidth}x${scaledHeight} at ${quality.targetFps} FPS")
+    }
+
+    private fun checkOrientationChange() {
+        val currentOrientation = resources.configuration.orientation
+        if (currentOrientation != lastOrientation) {
+            Log.i(TAG, "Orientation changed: $lastOrientation -> $currentOrientation")
+            lastOrientation = currentOrientation
+
+            // Update screen metrics
+            getScreenMetrics()
+
+            // Recreate virtual display with new dimensions
+            recreateVirtualDisplay()
+        }
+    }
+
+    private fun recreateVirtualDisplay() {
+        Log.i(TAG, "Recreating virtual display for new orientation: ${screenWidth}x${screenHeight}")
+
+        // Release old resources
+        virtualDisplay?.release()
+        imageReader?.close()
+
+        // Calculate new scaled dimensions
+        val scaledWidth = if (quality.maxHeight > 0 && screenHeight > quality.maxHeight) {
+            (screenWidth * quality.maxHeight / screenHeight)
+        } else {
+            screenWidth
+        }
+        val scaledHeight = if (quality.maxHeight > 0) {
+            minOf(screenHeight, quality.maxHeight)
+        } else {
+            screenHeight
+        }
+
+        // Create new ImageReader
+        imageReader = ImageReader.newInstance(
+            scaledWidth,
+            scaledHeight,
+            PixelFormat.RGBA_8888,
+            2
+        )
+
+        // Create new VirtualDisplay
+        virtualDisplay = mediaProjection?.createVirtualDisplay(
+            "ScreenCapture",
+            scaledWidth,
+            scaledHeight,
+            screenDensity,
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            imageReader?.surface,
+            null,
+            handler
+        )
+
+        Log.i(TAG, "Virtual display recreated: ${scaledWidth}x${scaledHeight}")
     }
 
     private fun startStreamingLoop() {
@@ -342,6 +415,14 @@ class ScreenCaptureService : Service() {
     private fun stopCapture() {
         Log.i(TAG, "Stopping capture")
         _streamState.value = StreamState.IDLE
+
+        // Unregister display listener
+        try {
+            val displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+            displayManager.unregisterDisplayListener(displayListener)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to unregister display listener: ${e.message}")
+        }
 
         // Cancel streaming job
         streamJob?.cancel()
