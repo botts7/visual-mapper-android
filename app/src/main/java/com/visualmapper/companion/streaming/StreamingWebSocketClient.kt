@@ -104,7 +104,7 @@ class StreamingWebSocketClient(
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                Log.d(TAG, "Received binary message: ${bytes.size()} bytes")
+                Log.d(TAG, "Received binary message: ${bytes.size} bytes")
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
