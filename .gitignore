@@ -24,3 +24,4 @@ app/release/
 # Secrets
 google-services.json
 secrets.properties
+keystore.properties

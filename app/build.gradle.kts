@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,6 +8,13 @@ plugins {
     id("kotlin-parcelize")
     // KSP for Room annotation processing (Phase 1 refactor)
     id("com.google.devtools.ksp")
+}
+
+// Load keystore properties from local.properties (not committed to repo)
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -23,10 +33,10 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("../visual-mapper.keystore")
-            storePassword = "visualmapper123"
-            keyAlias = "visual-mapper"
-            keyPassword = "visualmapper123"
+            storeFile = file(keystoreProperties.getProperty("storeFile", "../visual-mapper.keystore"))
+            storePassword = keystoreProperties.getProperty("storePassword", "")
+            keyAlias = keystoreProperties.getProperty("keyAlias", "visual-mapper")
+            keyPassword = keystoreProperties.getProperty("keyPassword", "")
         }
     }
 
