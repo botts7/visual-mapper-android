@@ -65,8 +65,14 @@ class ScreenEncoder(
     }
 
     /**
-     * Encode a Bitmap to JPEG with frame header for MJPEG protocol.
-     * Header format: 4 bytes frame_number (big-endian) + 4 bytes capture_time_ms (big-endian)
+     * Encode a Bitmap to JPEG with frame header for MJPEG protocol v2.
+     * Header format (12 bytes):
+     *   - 4 bytes: frame_number (big-endian int)
+     *   - 4 bytes: capture_time_ms (big-endian int)
+     *   - 2 bytes: width (big-endian unsigned short)
+     *   - 2 bytes: height (big-endian unsigned short)
+     *
+     * Width/height allows backend to detect orientation changes.
      *
      * @param bitmap The source bitmap
      * @param frameNumber Sequential frame number
@@ -74,17 +80,42 @@ class ScreenEncoder(
      * @return Frame data with header + JPEG bytes, or null on failure
      */
     fun encodeWithHeader(bitmap: Bitmap, frameNumber: Int, captureTimeMs: Long): ByteArray? {
-        val jpegBytes = encode(bitmap) ?: return null
+        // Scale if needed (to get actual encoded dimensions)
+        val scaledBitmap = scaleIfNeeded(bitmap)
+        val encodedWidth = scaledBitmap.width
+        val encodedHeight = scaledBitmap.height
 
-        // Create header: frame_number (4 bytes) + capture_time (4 bytes)
-        val header = ByteBuffer.allocate(8)
+        // Encode to JPEG
+        outputStream.reset()
+        val success = scaledBitmap.compress(
+            Bitmap.CompressFormat.JPEG,
+            currentQuality.jpegQuality,
+            outputStream
+        )
+
+        // Clean up scaled bitmap if it was created
+        if (scaledBitmap != bitmap) {
+            scaledBitmap.recycle()
+        }
+
+        if (!success) {
+            Log.e(TAG, "JPEG compression failed")
+            return null
+        }
+
+        val jpegBytes = outputStream.toByteArray()
+
+        // Create header: frame_number (4) + capture_time (4) + width (2) + height (2) = 12 bytes
+        val header = ByteBuffer.allocate(12)
         header.putInt(frameNumber)
         header.putInt((captureTimeMs % Int.MAX_VALUE).toInt())
+        header.putShort(encodedWidth.toShort())
+        header.putShort(encodedHeight.toShort())
 
         // Combine header + JPEG
-        val result = ByteArray(8 + jpegBytes.size)
-        System.arraycopy(header.array(), 0, result, 0, 8)
-        System.arraycopy(jpegBytes, 0, result, 8, jpegBytes.size)
+        val result = ByteArray(12 + jpegBytes.size)
+        System.arraycopy(header.array(), 0, result, 0, 12)
+        System.arraycopy(jpegBytes, 0, result, 12, jpegBytes.size)
 
         return result
     }

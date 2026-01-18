@@ -140,10 +140,17 @@ class ScreenCaptureService : Service() {
     private var screenHeight = 1920
     private var screenDensity = 320
     private var lastOrientation = 0
+    private var adaptiveFpsEnabled = true  // Cached from prefs
 
     // Frame pacing
     private var lastFrameTime = 0L
     private var frameNumber = 0
+
+    // Battery state caching (avoid checking every frame)
+    private var cachedBatteryPercent = 100
+    private var cachedIsCharging = false
+    private var lastBatteryCheck = 0L
+    private val BATTERY_CHECK_INTERVAL_MS = 30_000L  // Check battery every 30 seconds
 
     // Orientation change callback
     private val displayListener = object : DisplayManager.DisplayListener {
@@ -184,6 +191,8 @@ class ScreenCaptureService : Service() {
                 }
 
                 quality = StreamQuality.fromString(qualityStr)
+                // Cache adaptive FPS setting from prefs (avoids reading prefs every frame)
+                adaptiveFpsEnabled = StreamingConfig.loadFromPrefs(this, serverUrl, deviceId).adaptiveFps
                 startCapture(resultCode, resultData, serverUrl, deviceId)
             }
             ACTION_STOP -> {
@@ -264,8 +273,13 @@ class ScreenCaptureService : Service() {
             scaledWidth,
             scaledHeight,
             PixelFormat.RGBA_8888,
-            2  // Max 2 images in buffer
+            4  // Increased buffer for smoother capture
         )
+
+        // Set up callback for when frames are available (more efficient than polling)
+        imageReader?.setOnImageAvailableListener({ reader ->
+            processFrame(reader)
+        }, handler)
 
         // Create VirtualDisplay
         virtualDisplay = mediaProjection?.createVirtualDisplay(
@@ -279,6 +293,12 @@ class ScreenCaptureService : Service() {
             handler
         )
 
+        // Initialize battery state before starting loop
+        val (bp, ic) = getBatteryState()
+        cachedBatteryPercent = bp
+        cachedIsCharging = ic
+        lastBatteryCheck = System.currentTimeMillis()
+
         // Start streaming loop
         startStreamingLoop()
 
@@ -288,8 +308,13 @@ class ScreenCaptureService : Service() {
         lastOrientation = resources.configuration.orientation
 
         _streamState.value = StreamState.STREAMING
-        updateNotification("Streaming at ${quality.targetFps} FPS")
-        Log.i(TAG, "Capture started: ${scaledWidth}x${scaledHeight} at ${quality.targetFps} FPS")
+        val targetFps = if (adaptiveFpsEnabled) {
+            AdaptiveFps.getTargetFps(cachedBatteryPercent, cachedIsCharging, quality)
+        } else {
+            quality.targetFps
+        }
+        updateNotification("Streaming at $targetFps FPS")
+        Log.i(TAG, "Capture started: ${scaledWidth}x${scaledHeight}, target ${targetFps} FPS (adaptive: $adaptiveFpsEnabled, battery: ${cachedBatteryPercent}%, charging: $cachedIsCharging)")
     }
 
     private fun checkOrientationChange() {
@@ -330,8 +355,13 @@ class ScreenCaptureService : Service() {
             scaledWidth,
             scaledHeight,
             PixelFormat.RGBA_8888,
-            2
+            4  // Increased buffer
         )
+
+        // Set up callback for when frames are available
+        imageReader?.setOnImageAvailableListener({ reader ->
+            processFrame(reader)
+        }, handler)
 
         // Create new VirtualDisplay
         virtualDisplay = mediaProjection?.createVirtualDisplay(
@@ -348,66 +378,78 @@ class ScreenCaptureService : Service() {
         Log.i(TAG, "Virtual display recreated: ${scaledWidth}x${scaledHeight}")
     }
 
-    private fun startStreamingLoop() {
-        streamJob = scope.launch {
-            var lastCaptureTime = System.currentTimeMillis()
+    /**
+     * Process a frame from the ImageReader callback.
+     * Uses rate limiting based on adaptive FPS settings.
+     */
+    private fun processFrame(reader: ImageReader) {
+        if (_streamState.value != StreamState.STREAMING) return
 
-            while (isActive && _streamState.value == StreamState.STREAMING) {
-                try {
-                    // Get current battery state for adaptive FPS
-                    val (batteryPercent, isCharging) = getBatteryState()
-                    val frameDelay = if (StreamingConfig.loadFromPrefs(
-                            this@ScreenCaptureService, "", ""
-                        ).adaptiveFps) {
-                        AdaptiveFps.getFrameDelayMs(batteryPercent, isCharging, quality)
-                    } else {
-                        quality.frameDelayMs
+        val now = System.currentTimeMillis()
+
+        // Update battery state periodically
+        if (now - lastBatteryCheck > BATTERY_CHECK_INTERVAL_MS) {
+            val (bp, ic) = getBatteryState()
+            cachedBatteryPercent = bp
+            cachedIsCharging = ic
+            lastBatteryCheck = now
+        }
+
+        // Calculate minimum frame interval
+        val frameDelay = if (adaptiveFpsEnabled) {
+            AdaptiveFps.getFrameDelayMs(cachedBatteryPercent, cachedIsCharging, quality)
+        } else {
+            quality.frameDelayMs
+        }
+
+        // Rate limit: skip frame if too soon after last one
+        if (now - lastFrameTime < frameDelay) {
+            // Drop this frame - too soon
+            reader.acquireLatestImage()?.close()
+            return
+        }
+
+        val image = reader.acquireLatestImage() ?: return
+
+        try {
+            val bitmap = imageToBitmap(image)
+            if (bitmap != null) {
+                val captureTimeMs = System.currentTimeMillis()
+                val frameData = encoder?.encodeWithHeader(
+                    bitmap,
+                    ++frameNumber,
+                    captureTimeMs
+                )
+
+                if (frameData != null) {
+                    wsClient?.sendFrame(frameData)
+                    _frameCount.value = frameNumber
+                    lastFrameTime = now
+
+                    // Log periodically
+                    if (frameNumber == 1 || frameNumber % 60 == 0) {
+                        val stats = wsClient?.getStats()
+                        Log.i(TAG, "Frame $frameNumber sent, ${frameData.size} bytes, FPS: ${stats?.fps?.let { "%.1f".format(it) } ?: "?"}, target delay: ${frameDelay}ms")
                     }
-
-                    // Wait for next frame slot
-                    val elapsed = System.currentTimeMillis() - lastCaptureTime
-                    if (elapsed < frameDelay) {
-                        delay(frameDelay - elapsed)
-                    }
-                    lastCaptureTime = System.currentTimeMillis()
-
-                    // Capture frame
-                    val image = imageReader?.acquireLatestImage()
-                    if (image != null) {
-                        try {
-                            val bitmap = imageToBitmap(image)
-                            if (bitmap != null) {
-                                // Encode with header
-                                val captureTimeMs = System.currentTimeMillis()
-                                val frameData = encoder?.encodeWithHeader(
-                                    bitmap,
-                                    ++frameNumber,
-                                    captureTimeMs
-                                )
-
-                                if (frameData != null) {
-                                    wsClient?.sendFrame(frameData)
-                                    _frameCount.value = frameNumber
-
-                                    // Log periodically
-                                    if (frameNumber == 1 || frameNumber % 60 == 0) {
-                                        val stats = wsClient?.getStats()
-                                        Log.d(TAG, "Frame $frameNumber sent, ${frameData.size} bytes, FPS: ${stats?.fps?.let { "%.1f".format(it) } ?: "?"}")
-                                    }
-                                }
-
-                                if (!bitmap.isRecycled) {
-                                    bitmap.recycle()
-                                }
-                            }
-                        } finally {
-                            image.close()
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Streaming loop error: ${e.message}", e)
-                    delay(100)  // Brief pause on error
                 }
+
+                if (!bitmap.isRecycled) {
+                    bitmap.recycle()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Frame processing error: ${e.message}", e)
+        } finally {
+            image.close()
+        }
+    }
+
+    private fun startStreamingLoop() {
+        // The streaming is now callback-based via ImageReader.OnImageAvailableListener
+        // This method just maintains compatibility and could be used for periodic tasks
+        streamJob = scope.launch {
+            while (isActive && _streamState.value == StreamState.STREAMING) {
+                delay(1000)  // Periodic check
             }
         }
     }
